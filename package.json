@@ -1,0 +1,12 @@
+{
+  "name": "countdown-timer",
+  "version": "1.0.0",
+  "description": "Countdown Timer API on Express.js",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

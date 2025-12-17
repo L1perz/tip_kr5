@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Таймер обратного отсчёта</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #f1f3f6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 30px;
+        }
+
+        .card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        label {
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button.primary {
+            background: #0d6efd;
+            color: white;
+        }
+
+        button.delete {
+            background: #dc3545;
+            color: white;
+            margin-top: 10px;
+        }
+
+        .timer-card {
+            margin-bottom: 15px;
+        }
+
+        .timer-id {
+            color: #777;
+            font-size: 14px;
+        }
+
+        .time {
+            font-size: 26px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .expired {
+            color: #dc3545;
+        }
+
+        .progress {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #0d6efd;
+            transition: width 0.8s linear;
+        }
+
+        .progress-bar.expired {
+            background: #dc3545;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>⏱ Таймер обратного отсчёта</h1>
+
+        <div class="grid">
+            <!-- Левая колонка -->
+            <div class="card">
+                <label>Время (секунды)</label>
+                <input type="number" id="seconds" value="10" min="1">
+                <button class="primary" onclick="createTimer()">Создать таймер</button>
+            </div>
+
+            <!-- Правая колонка -->
+            <div>
+                <h2>Активные таймеры</h2>
+                <div id="timers"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let intervalId;
+        let activeTimers = {};
+
+
+        async function createTimer() {
+            const seconds = document.getElementById("seconds").value;
+
+            await fetch("/api/timers", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ seconds })
+            });
+
+            loadTimers();
+        }
+
+        async function loadTimers() {
+            const res = await fetch("/api/timers");
+            const timers = await res.json();
+
+            const container = document.getElementById("timers");
+            container.innerHTML = "";
+
+            timers.forEach(t => {
+                if (!activeTimers[t.id]) {
+                    activeTimers[t.id] = {
+                        total: null
+                    };
+                }
+
+                const div = document.createElement("div");
+                div.className = "card timer-card";
+                div.innerHTML = `
+        <div class="timer-id">ID: ${t.id}</div>
+        <div class="time" id="time-${t.id}">...</div>
+        <div class="progress">
+          <div class="progress-bar" id="bar-${t.id}"></div>
+        </div>
+        <button class="delete" onclick="deleteTimer(${t.id})">Удалить</button>
+      `;
+                container.appendChild(div);
+            });
+
+            startLiveUpdate(timers.map(t => t.id));
+        }
+
+        function startLiveUpdate(ids) {
+            if (intervalId) clearInterval(intervalId);
+
+            intervalId = setInterval(async () => {
+                for (const id of ids) {
+
+                    // если таймер уже завершён — не обновляем
+                    if (!activeTimers[id]) continue;
+
+                    const res = await fetch(`/api/timers/${id}?format=seconds`);
+                    if (!res.ok) continue;
+
+                    const data = await res.json();
+                    const timeEl = document.getElementById(`time-${id}`);
+                    const barEl = document.getElementById(`bar-${id}`);
+
+                    if (!timeEl || !barEl) continue;
+
+                    const remaining = parseInt(data.remaining);
+
+                    // сохраняем начальное время один раз
+                    if (activeTimers[id].total === null) {
+                        activeTimers[id].total = remaining;
+                    }
+
+                    // если время вышло
+                    if (remaining <= 0) {
+                        timeEl.textContent = "Время вышло";
+                        timeEl.classList.add("expired");
+                        barEl.style.width = "0%";
+                        barEl.classList.add("expired");
+
+                        // ❗ перестаём обновлять этот таймер
+                        delete activeTimers[id];
+                        continue;
+                    }
+
+                    // обычное обновление
+                    timeEl.textContent = data.remaining;
+
+                    const percent =
+                        (remaining / activeTimers[id].total) * 100;
+
+                    barEl.style.width = percent + "%";
+                }
+            }, 1000);
+        }
+
+
+        async function deleteTimer(id) {
+            await fetch(`/api/timers/${id}`, { method: "DELETE" });
+            delete activeTimers[id];
+
+            loadTimers();
+            
+        }
+
+        loadTimers();
+    </script>
+
+</body>
+
+</html>
