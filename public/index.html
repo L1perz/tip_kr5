@@ -184,7 +184,6 @@
             intervalId = setInterval(async () => {
                 for (const id of ids) {
 
-                    // если таймер уже завершён — не обновляем
                     if (!activeTimers[id]) continue;
 
                     const res = await fetch(`/api/timers/${id}?format=seconds`);
@@ -198,24 +197,21 @@
 
                     const remaining = parseInt(data.remaining);
 
-                    // сохраняем начальное время один раз
                     if (activeTimers[id].total === null) {
                         activeTimers[id].total = remaining;
                     }
 
-                    // если время вышло
                     if (remaining <= 0) {
                         timeEl.textContent = "Время вышло";
                         timeEl.classList.add("expired");
                         barEl.style.width = "0%";
                         barEl.classList.add("expired");
 
-                        // ❗ перестаём обновлять этот таймер
                         delete activeTimers[id];
                         continue;
                     }
 
-                    // обычное обновление
+                  
                     timeEl.textContent = data.remaining;
 
                     const percent =
