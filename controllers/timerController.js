@@ -9,7 +9,7 @@ exports.getAllTimers = (req, res) => {
 // GET /api/timers/:id
 exports.getTimerById = (req, res) => {
   const id = Number(req.params.id);
-  const format = req.query.format; // ← req.query
+  const format = req.query.format; 
 
   const timer = timers.find(t => t.id === id);
   if (!timer) {
